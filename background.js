@@ -14,41 +14,36 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 function fetchAndInjectCode(tabId, serverUrl, targetDiv) {
     Promise.all([
         fetch(`${serverUrl}/index.html`).then(response => response.text()),
-        fetch(`${serverUrl}/script.js`).then(response => response.text()),
         fetch(`${serverUrl}/styles.css`).then(response => response.text())
-    ]).then(([htmlCode, jsCode, cssCode]) => {
+    ]).then(([htmlCode, cssCode]) => {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
-            func: injectAll,
-            args: [htmlCode, jsCode, cssCode, targetDiv]
+            func: injectHTML,
+            args: [htmlCode, targetDiv]
         });
-        startAutoReload(tabId, serverUrl, targetDiv);
+        chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            func: injectCSS,
+            args: [cssCode, targetDiv]
+        });
+        chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            func: injectJSViaURL,
+            args: [`${serverUrl}/script.js`, targetDiv]
+        });
     }).catch(error => {
         console.error('Error fetching resources:', error);
-        showNotification('Error', 'Failed to fetch resources from the local server.');
     });
 }
 
-function injectAll(htmlCode, jsCode, cssCode, targetDiv) {
-    injectHTML(htmlCode, targetDiv);
-    injectJS(jsCode, targetDiv);
-    injectCSS(cssCode, targetDiv);
-}
-
-function startAutoReload(tabId, serverUrl, targetDiv) {
-    setInterval(() => {
-        fetchAndInjectCode(tabId, serverUrl, targetDiv);
-    }, 5000); // Reload every 5 seconds
-}
-
-function showNotification(title, message) {
-    chrome.notifications.create({
-        type: 'basic',
-        iconUrl: 'icon.png',
-        title: title,
-        message: message
-    });
-}
+// function showNotification(title, message) {
+//     chrome.notifications.create({
+//         type: 'basic',
+//         iconUrl: 'icon.png',
+//         title: title,
+//         message: message
+//     });
+// }
 
 function injectHTML(code, targetDiv) {
     if (targetDiv) {
@@ -67,21 +62,22 @@ function injectHTML(code, targetDiv) {
     }
 }
 
-function injectJS(code, targetDiv) {
+function injectJSViaURL(scriptUrl, targetDiv) {
     const script = document.createElement('script');
-    script.textContent = code;
+    script.src = scriptUrl;
+    script.type = 'text/javascript';
     if (targetDiv) {
         const targetElement = document.getElementById(targetDiv);
         if (targetElement) {
             targetElement.appendChild(script);
-            console.log('JavaScript injected successfully into target div');
+            console.log('JavaScript injected successfully via URL into target div');
         } else {
             console.error(`Target div with id "${targetDiv}" not found, injecting into head`);
             (document.head || document.documentElement).appendChild(script);
         }
     } else {
         (document.head || document.documentElement).appendChild(script);
-        console.log('JavaScript injected successfully into head');
+        console.log('JavaScript injected successfully via URL into head');
     }
 }
 
@@ -101,4 +97,10 @@ function injectCSS(code, targetDiv) {
         document.head.appendChild(style);
         console.log('CSS injected successfully into head');
     }
+}
+
+function injectAll(htmlCode, jsCode, cssCode, targetDiv) {
+    injectHTML(htmlCode, targetDiv);
+    injectJS(jsCode, targetDiv);
+    injectCSS(cssCode, targetDiv);
 }

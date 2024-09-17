@@ -2,7 +2,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete') {
         chrome.storage.sync.get('configs', function(data) {
             const configs = data.configs || [];
-            const matchingConfig = configs.find(config => config.enabled && tab.url.startsWith(config.url));
+            const matchingConfig = configs.find(config => config.enabled && tab.url === config.url);
             
             if (matchingConfig) {
                 fetchAndInjectCode(tabId, matchingConfig.serverUrl, matchingConfig.targetDiv);
